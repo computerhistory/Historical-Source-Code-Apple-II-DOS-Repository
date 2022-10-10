@@ -1,0 +1,63 @@
+ 
+How To Create A Customized Apple DOS 3.1 Master Disk Image
+---------------------------------------------------------------------------
+
+1. Customize the appdos31.asm file as you wish. You may need to change
+   the syntax to suit the assembler that you choose to use. Pay close
+   attention to the overall size of the binary generated, and to page
+   boundaries as per the warnings throughout the comments in the source.
+
+2. Assemble the source to produce a binary. Rename the binary to RAWDOS.
+   You may need to include the file attributes in the name depending on
+   the utility you use to add the binary to a disk image.
+   
+3. Open a DOS 3.1 master disk image in a disk image manipulation utility,
+   and then copy the newly assembled binary to the image, replacing the
+   existing original RAWDOS binary.
+   
+4. Boot the image in an Apple II emulator. Many emulators do not support
+   booting a 13 sector per track image directly, but that isn't a problem
+   (see Note 1 below for more detail):
+   
+	a. Boot a DOS 3.3 master disk image that contains the Apple's
+	   BOOT13 binary.
+	   
+	b. Enter "BRUN BOOT13" and wait for the prompt to enter the
+	   slot number to boot from (default=6).
+	   
+	c. Eject the DOS 3.3 disk and mount the DOS 3.1 image that has
+	   your custom RAWDOS file on it.
+	   
+	d. Press enter.
+	
+5. Once the DOS 3.1 disk has booted, enter "RUN MASTER.CREATE" and follow
+   the directions.
+   
+   
+Note 1:
+
+Apple's DISK II disk controller is outfitted with two 256x8 PROMs. One of
+these PROM's contains the 'Phase 0' boot code that is responsible for
+loading up and running the 'Phase 1' code located sector 0 of track 0 on
+a DOS boot disk. The second PROM is generally referred to as the 'logic
+state sequencer' PROM and is used to control disk accesses.
+
+The initial shipments of Apple's DISK II disk controller were outfitted with
+P5 (boot) and P6 (logic sequencer) PROMs. These versions of the PROMs were
+specific to 13 sector per track disks, which was the format used when DOS 3.1
+(and DOS 3.2) was released. With the release of DOS 3.3, the format changed
+to 16 sectors per track. Apple made newer PROMs available (P5A and P6A) to
+support the new disk format. While you cannot boot a 13 sector per track
+disk directly with the newer P5A boot PROM (it is specific to 16 sectors
+per track), the P6A logic-state sequencer has no issue reading and writing
+both 13 and 16 sector per track disks.
+
+Indeed, that is why Apple provided the BOOT13 binary (and the "BASICS"
+diskette) when DOS 3.3 became available. With a controller outfitted with
+the newer PROMs, it's simply a matter of booting a DOS 3.3 disk, and
+entering 'BRUN BOOT13'.
+
+   
+ Scott LaBombard
+ labomb@rochester.rr.com
+ 12/07/2013

@@ -1,0 +1,977 @@
+0001   0000             
+0002   0000             #INCLUDE "MOTO.H"
+0040+  0000             .LIST
+0003   0000             
+0004   0000             ***************************
+0005   0000             *         DISC-II         *
+0006   0000             *     13-SECTOR FORMAT    *
+0007   0000             *      READ AND WRITE     *
+0008   0000             *       SUBROUTINES       *
+0009   0000             *                         *
+0010   0000             ***************************
+0011   0000             *                         *
+0012   0000             *                         *
+0013   0000             *     COPYRIGHT 1978      *
+0014   0000             *   APPLE COMPUTER INC.   *
+0015   0000             *                         *
+0016   0000             *   ALL RIGHTS RESERVED   *
+0017   0000             *                         *
+0018   0000             ***************************
+0019   0000             *                         *
+0020   0000             *      MAY 25, 1978       *
+0021   0000             *          WOZ            *
+0022   0000             *      R. WIGGINTON       *
+0023   0000             *                         *
+0024   0000             ***************************
+
+Page      1                                      
+
+0025   0000             	EJECT
+0026   0000             ***************************
+0027   0000             *                         *
+0028   0000             *     CRITICAL TIMING     *
+0029   0000             *   REQUIRES PAGE BOUND   *
+0030   0000             *   CONSIDERATIONS FOR    *
+0031   0000             *      CODE AND DATA      *
+0032   0000             *                         *
+0033   0000             *     -----CODE-----      *
+0034   0000             *                         *
+0035   0000             *   VIRTUALLY THE ENTIRE  *
+0036   0000             *     'WRITE' ROUTINE     *
+0037   0000             *      MUST NOT CROSS     *
+0038   0000             *     PAGE BOUNDARIES.    *
+0039   0000             *                         *
+0040   0000             *  CRITICAL BRANCHES IN   *
+0041   0000             *  THE 'WRITE', 'READ',   *
+0042   0000             *  AND 'READ ADR' SUBRS   *
+0043   0000             *  WHICH MUST NOT CROSS   *
+0044   0000             *  PAGE BOUNDARIES ARE    *
+0045   0000             *  NOTED IN COMMENTS.     *
+0046   0000             *                         *
+0047   0000             *     -----DATA-----      *
+0048   0000             *                         *
+0049   0000             *  NBUF1, NBUF2, NBUF3,   *
+0050   0000             *  NBUF4, AND NBUF5 ARE   *
+0051   0000             *  51-BYTE RAM BUFFERS    *
+0052   0000             *  WHICH SHOULD ALL BE    *
+0053   0000             *  LOCATED ON A SINGLE    *
+0054   0000             *  PAGE BEGINNING WITH    *
+0055   0000             *  NBUF1. (NBUF5 IS 52).  *
+0056   0000             *                         *
+0057   0000             *  NBUF6, NBUF7, AND      *
+0058   0000             *  NBUF8 MUST NOT CROSS   *
+0059   0000             *  PAGE BOUNDARIES AND    *
+0060   0000             *  SHOULD BE LOCATED      *
+0061   0000             *  ON A PAGE BEGINNING    *
+0062   0000             *  WITH NBUF6.  NBUF6     *
+0063   0000             *  AND NBUF7 ARE 51 BYTES *
+0064   0000             *  WHILE NBUF8 IS 52.     *
+0065   0000             *                         *
+0066   0000             *  NIBLIZING TABLE 'NIBL' *
+0067   0000             *  (32 BYTES) MUST NOT    *
+0068   0000             *  CROSS PAGE BOUNDARY.   *
+0069   0000             *  CONVERTS 5-BIT NIBLS   *
+0070   0000             *  TO 7-BIT NIBLS.        *
+0071   0000             *                         *
+0072   0000             *  DENIBLIZING TABLE      *
+0073   0000             *  'DNIBL' MUST BE ON A   *
+0074   0000             *  PAGE BOUNDARY, BUT     *
+0075   0000             *  ONLY DNIBL,$AB TO      *
+0076   0000             *  DNIBL,$FF NEED BE      *
+0077   0000             *  USED.  CONVERTS 7-BIT  *
+0078   0000             *  NIBLS TO 5-BIT NIBLS.  *
+0079   0000             *                         *
+0080   0000             ***************************
+
+Page      2                                      
+
+0081   0000              EJECT
+0082   0000             ***************************
+0083   0000             *                         *
+0084   0000             *         EQUATES         *
+0085   0000             *                         *
+0086   0000             ***************************
+0087   0000             *                         *
+0088   0000             *    -----PRENIBL----     *
+0089   0000             *      AND POSTNIBL       *
+0090   0000             *                         *
+0091   0000             ***************************
+0092   0000             BUF	EQU	$3E		;TWO BYTE POINTER.
+0093   0000             *
+0094   0000             *        POINTS TO 256-BYTE
+0095   0000             *        USER BUFFER ANYWHERE
+0096   0000             *        IN MEMORY.  PRENIBL
+0097   0000             *        CONVERTS USER DATA
+0098   0000             *        (IN BUF) INTO 5-BIT
+0099   0000             *        NIBLS 000ABCDE IN
+0100   0000             *        NBUF1 THROUGH NBUF8
+0101   0000             *        PRIOR TO 'WRITE'.
+0102   0000             *        POSTNIBL CONVERTS
+0103   0000             *        5-BIT NIBLS ABCDE000
+0104   0000             *        BACK TO USER DATA
+0105   0000             *        (IN BUF) AFTER 'READ'.
+0106   0000             *
+0107   0000             NBUF1	EQU	$3B00
+0108   0000             NBUF2	EQU	$3B33		;OBSERVE THESE
+0109   0000             NBUF3	EQU	$3B66		;PLACEMENTS
+0110   0000             NBUF4	EQU	$3B99		;RELATIVE TO
+0111   0000             NBUF5	EQU	$3BCC		;PAGE STARTS!
+0112   0000             NBUF6	EQU	$3C00	
+0113   0000             NBUF7	EQU	$3C33	
+0114   0000             NBUF8	EQU	$3C66		;(TO $BC99)
+0115   0000             *
+0116   0000             T0	EQU	$26		;TEMPS USED BY PRENIBL
+0117   0000             T1	EQU	$27		;   AND POSTNIBL.
+0118   0000             T2	EQU	$2A		;TEMP USED BY PRENIBL.
+0119   0000             *
+0120   0000             ************************
+0121   0000             *                      *
+0122   0000             *    ----READADR----   *
+0123   0000             *                      *
+0124   0000             ************************
+0125   0000             COUNT	EQU	$26		;'MUST FIND' COUNT.
+0126   0000             LAST	EQU	$26		;'ODD BIT' NIBLS.
+0127   0000             CSUM	EQU	$27		;CHECKSUM BYTE.
+0128   0000             CSSTV	EQU	$2C		;FOUR BYTES,
+0129   0000             *       CHECKSUM, SECTOR, TRACK, AND VOLUME.
+0130   0000             *
+0131   0000             ************************
+0132   0000             *                      *
+0133   0000             *    ----WRITE----     *
+0134   0000             *                      *
+0135   0000             *    USES ALL NBUFS    *
+0136   0000             *      AND 32-BYTE     *
+0137   0000             *   DATA TABLE 'NIBL'  *
+0138   0000             *                      *
+0139   0000             ************************
+0140   0000             WTEMP	EQU	$26		;TEMP FOR DATA AT NBUF6,0.
+0141   0000             SLOTZ	EQU	$27		;SLOTNUM IN Z-PAG LOC.
+0142   0000             SLOTABS	EQU	$678		;SLOTNUM IN NON-ZPAG LOC.
+0143   0000             *
+0144   0000             ************************
+0145   0000             *                      *
+0146   0000             *     -----READ----    *
+0147   0000             *                      *
+0148   0000             *    USES ALL NBUFS    *
+0149   0000             *  USES LAST 54 BYTES  *
+0150   0000             *  OF A CODE PAGE FOR  *
+0151   0000             *  USED BYTES OF DNIBL *
+0152   0000             *  TABLE.              *
+0153   0000             *                      *
+0154   0000             ************************
+0155   0000             IDX	EQU	$26 		;INDEX INTO (BUF).
+0156   0000             DNIBL	EQU	$3A00		;7-BIT TO 5-BIT NIBLS.
+0157   0000             *
+0158   0000             ************************
+0159   0000             *                      *
+0160   0000             *    ---- SEEK ----    *
+0161   0000             *                      *
+0162   0000             ************************
+0163   0000             TRKCNT	EQU	$26		;HALFTRKS MOVED COUNT.
+0164   0000             PRIOR	EQU	$27		;PRIOR HALFTRACK.
+0165   0000             TRKN	EQU	$2A		;DESIRED TRACK.
+0166   0000             SLOTTEMP EQU	$2B		;SLOT NUM TIMES $10.
+0167   0000             CURTRK	EQU	$478		;CURRENT TRACK ON ENTYR.
+0168   0000             *
+0169   0000             ************************
+0170   0000             *                      *
+0171   0000             *   ---- MSWAIT ----   *
+0172   0000             *                      *
+0173   0000             ************************
+0174   0000             MONTIMEL EQU	$46
+0175   0000             MONTIMEH EQU	$47
+0176   0000             *
+0177   0000             ************************
+0178   0000             *                      *
+0179   0000             *    DEVICE ADDRESS    *
+0180   0000             *     ASSIGNMENTS      *
+0181   0000             *                      *
+0182   0000             ************************
+0183   0000             PHASEOFF EQU	$C080		;STEPPER PHASE OFF.
+0184   0000             PHASEON	EQU	$C081		;STEPPER PHASE ON.
+0185   0000             Q6L	EQU	$C08C		;Q7L,Q6L=READ
+0186   0000             Q6H	EQU	$C08D		;Q7L,Q6H=SENSE WPROT
+0187   0000             Q7L	EQU	$C08E		;Q7H,Q6L=WRITE
+0188   0000             Q7H	EQU	$C08F		;Q7H,Q6H=WRITE STORE
+
+Page      3                                      
+
+0189   0000             	EJECT
+0190   0000             ****************************
+0191   0000             *                          *
+0192   0000             *    PRENIBLIZE SUBR       *
+0193   0000             *                          *
+0194   0000             ****************************
+0195   0000             *                          *
+0196   0000             *  CONVERTS 256 BYTES OF   *
+0197   0000             *  USER DATA IN (BUF),0    *
+0198   0000             *  TO (BUF),255 INTO 410   *
+0199   0000             *  5-BIT NIBLS (000ABCDE)  *
+0200   0000             *  IN NBUF1 THROUGH NBUF8. *
+0201   0000             *                          *
+0202   0000             *    ---- ON ENTRY ----    *
+0203   0000             *                          *
+0204   0000             *  BUF IS 2-BYTE POINTER   *
+0205   0000             *    TO 256 BYTES OF USER  *
+0206   0000             *    DATA.                 *
+0207   0000             *                          *
+0208   0000             *    ---- ON EXIT -----    *
+0209   0000             *                          *
+0210   0000             *  A-REG: UNCERTAIN.       *
+0211   0000             *  X-REG: UNCERTAIN.       *
+0212   0000             *  Y-REG: HOLDS $FF.       *
+0213   0000             *  CARRY: UNCERTAIN.       *
+0214   0000             *                          *
+0215   0000             *  NBUF1 THROUGH NBUF8     *
+0216   0000             *    CONTAIN 5-BIT NIBLS   *
+0217   0000             *    OF FORM 000ABCDE.     *
+0218   0000             *                          *
+0219   0000             *  TEMPS T0, T1, T2 USED.  *
+0220   0000             *                          *
+0221   0000             ****************************
+0222   3800             	ORG	$3800
+0223   3800             * OBJ $B800
+0224   3800 A2 32       PRENIBL	LDX	#$32		;INDEX FOR (51) 5-BYTE PASSES.
+0225   3802 A0 00       	LDY	#$0		;USER BUF INDEX.
+0226   3804 B1 3E       PNIB1	LDA	(BUF),Y		;FIRST OF 5 USER BYTES.
+0227   3806 85 26       	STA	T0		;(ONLY 3 LSB'S USED)
+0228   3808 4A          	LSRA
+0229   3809 4A          	LSRA			;5 MSB'S TO LOW BITS.
+0230   380A 4A          	LSRA
+0231   380B 9D 00 3B    	STA	NBUF1,X		;FIRST OF 8 5-BIT NIBLS.
+0232   380E C8          	INY
+0233   380F B1 3E       	LDA	(BUF),Y		;SECOND OF 5 USER BYTES.
+0234   3811 85 27       	STA	T1		;ONLY 3 LSB'S USED)
+0235   3813 4A          	LSRA
+0236   3814 4A          	LSRA			;5 MSB'S TO LOW BITS.
+0237   3815 4A          	LSRA
+0238   3816 9D 33 3B    	STA	NBUF2,X		;SECOND OF 8 5-BIT NIBLS.
+0239   3819 C8          	INY
+0240   381A B1 3E       	LDA	(BUF),Y		;THIRD OF 5 USER BYTES.
+0241   381C 85 2A       	STA	T2		;(ONLY 3 LSB'S USED)
+0242   381E 4A          	LSRA
+0243   381F 4A          	LSRA			;5 MSB'S TO LOW BITS.
+0244   3820 4A          	LSRA
+0245   3821 9D 66 3B    	STA	NBUF3,X		;THIRD OF 8 5-BIT NIBLS.
+0246   3824 C8          	INY
+0247   3825 B1 3E       	LDA	(BUF),Y		;FOURTH OF 5 USER BYTES.
+0248   3827 4A          	LSRA
+0249   3828 26 2A       	ROL	T2		;LSB INTO T2.
+0250   382A 4A          	LSRA
+0251   382B 26 27       	ROL	T1		;NEXT LSB INTO T1.
+0252   382D 4A          	LSRA
+0253   382E 26 26       	ROL	T0		;NEXT LSB INTO T0.
+0254   3830 9D 99 3B    	STA	NBUF4,X		;FOURTH OF 8 5-BIT NIBLS.
+0255   3833 C8          	INY
+0256   3834 B1 3E       	LDA	(BUF),Y		;FIFTH OF 5 USER BYTES.
+0257   3836 4A          	LSRA
+0258   3837 26 2A       	ROL	T2		;LSB INTO T2.
+0259   3839 4A          	LSRA
+0260   383A 26 27       	ROL	T1		;NEXT LSB INTO T1.
+0261   383C 4A          	LSRA
+0262   383D 9D CC 3B    	STA	NBUF5,X		;FIFTH OF 8 5-BIT NIBLS.
+0263   3840 A5 26       	LDA	T0
+0264   3842 2A          	ROLA			;NEXT LSB.
+0265   3843 29 1F       	AND	#$1F		;TRUNCATE TO 5 BITS.
+0266   3845 9D 00 3C    	STA	NBUF6,X		;SIXTH OF 8 5-BIT NIBLS.
+0267   3848 A5 27       	LDA	T1
+0268   384A 29 1F       	AND	#$1F		;TRUNCATE TO 5 BITS.
+0269   384C 9D 33 3C    	STA	NBUF7,X		;SEVENTH OF 8 5-BIT NIBLS.
+0270   384F A5 2A       	LDA	T2
+0271   3851 29 1F       	AND	#$1F		;TRUNCATE TO 5 BITS.
+0272   3853 9D 66 3C    	STA	NBUF8,X		;EIGHTH OF 8 5-BIT NIBLS.
+0273   3856 C8          	INY
+0274   3857 CA          	DEX			;NEXT OF (51) 5-BYTE PASSES.
+0275   3858 10 AA       	BPL	PNIB1
+0276   385A B1 3E       	LDA 	(BUF),Y
+0277   385C AA          	TAX
+0278   385D 29 07       	AND 	#$7		;3 LSB'S OF LAST
+0279   385F 8D 99 3C    	STA	NBUF8+$33	;USER BYTE.
+0280   3862 8A          	TXA
+0281   3863 4A          	LSRA
+0282   3864 4A          	LSRA
+0283   3865 4A          	LSRA			;5 MSB'S OF LAST
+0284   3866 8D FF 3B    	STA	NBUF5+$33	;USER BYTE.
+0285   3869 60          	RTS
+
+Page      4                                      
+
+0286   386A             	EJECT
+0287   386A             ************************
+0288   386A             *                      *
+0289   386A             *      WRITE SUBR      *
+0290   386A             *                      *
+0291   386A             ************************
+0292   386A             *                      *
+0293   386A             *   WRITES DATA FROM   *
+0294   386A             *    NBUF1 TO NBUF8    *
+0295   386A             *   CONVERTING 5-BIT   *
+0296   386A             *    TO 7-BIT NIBLS    *
+0297   386A             *   VIA 'NIBL' TABLE.  :
+0298   386A             *                      *
+0299   386A             *  FIRST, NBUF6 TO     *
+0300   386A             *   NBUF8, HIGH TO LOW *
+0301   386A             *  THEN, NBUF1 TO      *
+0302   386A             *   NBUF5, LOW TO HIGH *
+0303   386A             *                      *
+0304   386A             *  ---- ON ENTRY ----  *
+0305   386A             *                      *
+0306   386A             *   X-REG: SLOTNUM     *
+0307   386A             *        TIMES $10.    *
+0308   386A             *                      *
+0309   386A             *   NBUF1 TO NBUF8     *
+0310   386A             *    HOLD NIBLS FROM   *
+0311   386A             *    PRENIBL SUBR.     *
+0312   386A             *    (000ABCDE)        *
+0313   386A             *                      *
+0314   386A             *  ---- ON EXIT -----  *
+0315   386A             *                      *
+0316   386A             *  CARRY SET IF ERROR. *
+0317   386A             *   (W PROT VIOLATION) *
+0318   386A             *                      *
+0319   386A             *  IF NO ERROR:        *
+0320   386A             *                      *
+0321   386A             *    A-REG: UNCERTAIN. *
+0322   386A             *    X-REG: UNCHANGED. *
+0323   386A             *    Y-REG: HOLDS $00. *
+0324   386A             *    CARRY CLEAR.      *
+0325   386A             *                      *
+0326   386A             *    SLOTABS, SLOTZ,   *
+0327   386A             *     AND WTEMP USED.  *
+0328   386A             *                      *
+0329   386A             *  ---- ASSUMES ----   *
+0330   386A             *                      *
+0331   386A             *  1 USEC CYCLE TIME   *
+0332   386A             *                      *
+0333   386A             ************************
+0334   386A 38          WRITE	SEC			;ANTICIPATE WPROT ERR.
+0335   386B BD 8D C0    	LDA	Q6H,X
+0336   386E BD 8E C0    	LDA	Q7L,X		;SENSE WPROT FLAG.
+0337   3871 30 7C       	BMI	WEXIT		;IF HIGH, THEN ERR.
+0338   3873 86 27       	STX	SLOTZ		;FOR ZERO PAGE ACCESS.
+0339   3875 8E 78 06    	STX	SLOTABS		;FOR NON-ZERO PAGE.
+0340   3878 AD 00 3C    	LDA	NBUF6
+0341   387B 85 26       	STA	WTEMP		;FOR ZERO-PAGE ACCESS.
+0342   387D A9 FF       	LDA	#$FF		;SYNC DATA.
+0343   387F 9D 8F C0    	STA	Q7H,X		;(5)  WRITE 1ST NIBL.
+0344   3882 1D 8C C0    	ORA	Q6L,X		;(4)
+0345   3885 48          	PHA			;(3)
+0346   3886 68          	PLA			;(4)  CRITICAL TIMING!
+0347   3887 EA          	NOP			;(2)
+0348   3888 A0 0A       	LDY	#$A		;(2)  FOR 11 NIBLS.
+0349   388A 05 26       WSYNC	ORA	WTEMP		;(3)  FOR TIMING.
+0350   388C 20 F4 38    	JSR	WNIBL7		;(13,9,6)  WRITE SYNC.
+0351   388F 88          	DEY			;(2)
+0352   3890 D0 F8       	BNE	WSYNC		;(2*)  MUST NOT CROSS PAGE!
+0353   3892 A9 D5       	LDA	#$D5		;(2)  1ST DATA MARK.
+0354   3894 20 F3 38    	JSR	WNIBL9		;(15,9,6)
+0355   3897 A9 AA       	LDA	#$AA		;(2)  2ND DATA MARK.
+0356   3899 20 F3 38    	JSR	WNIBL9		;(15,9,6)
+0357   389C A9 AD       	LDA	#$AD		;(2)  3RD DATA MARK.
+0358   389E 20 F3 38    	JSR	WNIBL9		;(15,9,6)
+0359   38A1 98          	TYA			;(2)  CLEAR CHKSUM.
+0360   38A2 A0 9A       	LDY	#$9A		;(2)  NBUF6-8 INDEX.
+0361   38A4 D0 03       	BNE	WDATA1		;(3)  ALWAYS.  NO PAGE CROSS!!
+0362   38A6 B9 00 3C    WDATA0	LDA	NBUF6,Y		;(4)  PRIOR 5-BIT NIBL.
+0363   38A9 59 FF 3B    WDATA1	EOR	NBUF6-1,Y	;(5)  XOR WITH CURRENT.
+0364   38AC             *   (NBUF6 MUST BE ON PAGE BOUNDARY FOR TIMING!!)
+0365   38AC AA          	TAX			;(2)  INDEX TO 7-BIT NIBL.
+0366   38AD BD 9A 3C    	LDA	NIBL,X		;(4)  MUST NOT CROSS PAGE!
+0367   38B0 A6 27       	LDX	SLOTZ		;(3)  CRITICAL TIMING!
+0368   38B2 9D 8D C0    	STA	Q6H,X		;(5)  WRITE NIBL.
+0369   38B5 BD 8C C0    	LDA	Q6L,X		;(4)
+0370   38B8 88          	DEY			;(2)  NEXT NIBL.
+0371   38B9 D0 EB       	BNE	WDATA0		;(2*)  MUST NOT CROSS PAGE!
+0372   38BB A5 26       	LDA	WTEMP		;(3)  PRIOR NIBL FROM BUF6.
+0373   38BD EA          	NOP			;(2)  CRITICAL TIMING.
+0374   38BE 59 00 3B    WDATA2	EOR	NBUF1,Y		;(4)  XOR NBUF1 NIBL.
+0375   38C1 AA          	TAX			;(2)  INDEX TO 7-BIT NIBL.
+0376   38C2 BD 9A 3C    	LDA	NIBL,X		;(4)
+0377   38C5 AE 78 06    	LDX	SLOTABS		;(4)  TIMING CRITICAL.
+0378   38C8 9D 8D C0    	STA	Q6H,X		;(5)  WRITE NIBL.
+0379   38CB BD 8C C0    	LDA	Q6L,X		;(4)
+0380   38CE B9 00 3B    	LDA	NBUF1,Y		;(4)  PRIOR 5-BIT NIBL.
+0381   38D1 C8          	INY			;(2)  NEXT NBUF1 NIBL.
+0382   38D2 D0 EA       	BNE	WDATA2		;(2*)  MUST NOT CROSS PAGE!
+0383   38D4 AA          	TAX			;(2)  LAST NIBL AS CHKSUM.
+0384   38D5 BD 9A 3C    	LDA	NIBL,X		;(4)  INDEX TO 7-BIT NIBL.
+0385   38D8 A6 27       	LDX	SLOTZ		;(3)
+0386   38DA 20 F6 38    	JSR	WNIBL		;(6,9,6)  WRITE CHKSUM.
+0387   38DD A9 DE       	LDA	#$DE		;(2)  DM4, BIT SLIP MARK.
+0388   38DF 20 F3 38    	JSR	WNIBL9		;(15,9,6)    WRITE IT.
+0389   38E2 A9 AA       	LDA	#$AA		;(2)  DM5, BIT SLIP MARK.
+0390   38E4 20 F3 38    	JSR	WNIBL9		;(15,9,6)    WRITE IT.
+0391   38E7 A9 EB       	LDA	#$EB		;(2)  DM6, BIT SLIP MARK.
+0392   38E9 20 F3 38    	JSR	WNIBL9		;(15,9,6)    WRITE IT.
+0393   38EC BD 8E C0    	LDA	Q7L,X		;OUT OF WRITE MODE.
+0394   38EF BD 8C C0    WEXIT	LDA	Q6L,X		;TO READ MODE.
+0395   38F2 60          	RTS			;RETURN FROM WRITE.
+0396   38F3             *****************************
+0397   38F3             *                           *
+0398   38F3             *   7-BIT NIBL WRITE SUBRS  *
+0399   38F3             *                           *
+0400   38F3             *   A-REG OR'D PRIOR EXIT   *
+0401   38F3             *       CARRY CLEARED       *
+0402   38F3             *                           *
+0403   38F3             *****************************
+0404   38F3 18          WNIBL9	CLC			;(2)  9 CYCLES, THEN WRITE.
+0405   38F4 48          WNIBL7	PHA			;(3)  7 CYCLES, THEN WRITE.
+0406   38F5 68          	PLA			;(4)
+0407   38F6 9D 8D C0    WNIBL	STA	Q6H,X		;(5)  NIBL WRITE SUB.
+0408   38F9 1D 8C C0    	ORA	Q6L,X		;(4)  CLOBBERS ACC, NOT CARRY.
+0409   38FC 60          	RTS
+
+Page      5                                      
+
+0410   38FD             	EJECT
+0411   38FD             **************************
+0412   38FD             *                        *
+0413   38FD             *     READ SUBROUTINE    *
+0414   38FD             *                        *
+0415   38FD             **************************
+0416   38FD             *                        *
+0417   38FD             *    READS 5-BIT NIBLS   *
+0418   38FD             *     (ABCDE000) INTO    *
+0419   38FD             *   NBUF1 THROUGH NBUF8  *
+0420   38FD             *    CONVERTING 7-BIT    *
+0421   38FD             *     NIBLS TO 5-BIT     *
+0422   38FD             *    VIA 'DNIBL' TABLE   *
+0423   38FD             *                        *
+0424   38FD             *  FIRST READS NBUF6 TO  *
+0425   38FD             *    NBUF8 HIGH TO LOW,  *
+0426   38FD             *  THEN READS NBUF1 TO   *
+0427   38FD             *    NBUF5 LOW TO HIGH   *
+0428   38FD             *                        *
+0429   38FD             *   ---- ON ENTRY ----   *
+0430   38FD             *                        *
+0431   38FD             *  X-REG: SLOTNUM        *
+0432   38FD             *         TIMES $10.     *
+0433   38FD             *                        *
+0434   38FD             *  READ MODE (Q6L, Q7L)  *
+0435   38FD             *                        *
+0436   38FD             *   ---- ON EXIT -----   *
+0437   38FD             *                        *
+0438   38FD             *  CARRY SET IF ERROR.   *
+0439   38FD             *                        *
+0440   38FD             *  IF NO ERROR:          *
+0441   38FD             *     A-REG: HOLDS $AA   *
+0442   38FD             *     X-REG: UNCHANGED.  *
+0443   38FD             *     Y-REG: HOLDS $00   *
+0444   38FD             *     CARRY CLEAR.       *
+0445   38FD             *                        *
+0446   38FD             *     NBUF1 TO NBUF8     *
+0447   38FD             *       HOLD 5-BIT       *
+0448   38FD             *       NIBLS ABCDE000.  *
+0449   38FD             *                        *
+0450   38FD             *     USES TEMP 'IDX'.   *
+0451   38FD             *                        *
+0452   38FD             *   ---- CAUTION -----   *
+0453   38FD             *                        *
+0454   38FD             *        OBSERVE         *
+0455   38FD             *    'NO PAGE CROSS'     *
+0456   38FD             *      WARNINGS ON       *
+0457   38FD             *    SOME BRANCHES!!     *
+0458   38FD             *                        *
+0459   38FD             *   ---- ASSUMES ----    *
+0460   38FD             *                        *
+0461   38FD             *   1 USEC CYCLE TIME    *
+0462   38FD             *                        *
+0463   38FD             **************************
+0464   38FD A0 20       READ	LDY	#$20		;'MUST FIND' COUNT.
+0465   38FF 88          RSYNC	DEY			;IF CAN'T FIND MARKS
+0466   3900 F0 61       	BEQ	RDERR		;THEN EXIT WITH CARRY SET.
+0467   3902 BD 8C C0    RD1	LDA	Q6L,X		;READ NIBL.
+0468   3905 10 FB       	BPL	RD1		;*** NO PAGE CROSS! ***
+0469   3907 49 D5       RSYNC1	EOR	#$D5		;DATA MARK 1?
+0470   3909 D0 F4       	BNE	RSYNC		;LOOP IF NOT.
+0471   390B EA          	NOP			;DELAY BETWEEN NIBLS.
+0472   390C BD 8C C0    RD2	LDA	Q6L,X
+0473   390F 10 FB       	BPL	RD2		;*** NO PAGE CROSS! ***
+0474   3911 C9 AA       	CMP	#$AA		;DATA MARK 2?
+0475   3913 D0 F2       	BNE	RSYNC1		;  (IF NOT, IS IT DM1?)
+0476   3915 A0 9A       	LDY	#$9A		;INIT NBUF6 INDEX.
+0477   3917             *              (ADDED NIBL DELAY)
+0478   3917 BD 8C C0    RD3	LDA	Q6L,X
+0479   391A 10 FB       	BPL	RD3		;*** NO PAGE CROSS! ***
+0480   391C C9 AD       	CMP	#$AD		;DATA MARK 3?
+0481   391E D0 E7       	BNE	RSYNC1		;  (IF NOT, IS IT DM1?)
+0482   3920             *         (CARRY SET IF DM3!)
+0483   3920 A9 00       	LDA	#$00		;INIT CHECKSUM.
+0484   3922 88          RDATA1	DEY
+0485   3923 84 26       	STY	IDX
+0486   3925 BC 8C C0    RD4	LDY	Q6L,X
+0487   3928 10 FB       	BPL	RD4		;*** NO PAGE CROSS! ***
+0488   392A 59 00 3A    	EOR	DNIBL,Y		;XOR 5-BIT NIBL.
+0489   392D A4 26       	LDY	IDX
+0490   392F 99 00 3C    	STA	NBUF6,Y		;STORE IN NBUF6 PAGE.
+0491   3932 D0 EE       	BNE	RDATA1		;TAKEN IF Y-REG NONZERO.
+0492   3934 84 26       RDATA2	STY	IDX
+0493   3936 BC 8C C0    RD5	LDY	Q6L,X
+0494   3939 10 FB       	BPL	RD5		;*** NO PAGE CROSS! ***
+0495   393B 59 00 3A    	EOR	DNIBL,Y		;XOR 5-BIT NIBL.
+0496   393E A4 26       	LDY	IDX
+0497   3940 99 00 3B    	STA	NBUF1,Y		;STORE IN NBUF1 PAGE.
+0498   3943 C8          	INY	
+0499   3944 D0 EE       	BNE	RDATA2
+0500   3946 BC 8C C0    RD6	LDY	Q6L,X		;READ 7-BIT CSUM NIBL.
+0501   3949 10 FB       	BPL	RD6		;*** NO PAGE CROSS! ***
+0502   394B D9 00 3A    	CMP	DNIBL,Y		;IF LAST NBUF1 NIBL NOT
+0503   394E D0 13       	BNE	RDERR		;EQUAL CHKSUM NIBL THEN ERR.
+0504   3950 BD 8C C0    RD7	LDA	Q6L,X
+0505   3953 10 FB       	BPL	RD7		;*** NO PAGE CROSS! ***
+0506   3955 C9 DE       	CMP	#$DE		;FIRST BIT SLIP MARK?
+0507   3957 D0 0A       	BNE	RDERR		;  (ERR IF NOT)
+0508   3959 EA          	NOP			;DELAY BETWEEN NIBLS.
+0509   395A BD 8C C0    RD8	LDA	Q6L,X
+0510   395D 10 FB       	BPL	RD8		;*** NO PAGE CROSS! ***
+0511   395F C9 AA       	CMP	#$AA		;SECOND BIT SLIP MARK?
+0512   3961 F0 5C       	BEQ	RDEXIT		;  (DONE IF IT IS)
+0513   3963 38          RDERR	SEC			;INDICATE 'ERROR EXIT'.
+0514   3964 60          	RTS			;RETURN FROM READ OR READADR.
+
+Page      6                                      
+
+0515   3965             	EJECT
+0516   3965             ****************************
+0517   3965             *                          *
+0518   3965             *    READ ADDRESS FIELD    *
+0519   3965             *                          *
+0520   3965             *        SUBROUTINE        *
+0521   3965             *                          *
+0522   3965             ****************************
+0523   3965             *                          *
+0524   3965             *    READS VOLUME, TRACK   *
+0525   3965             *        AND SECTOR        *
+0526   3965             *                          *
+0527   3965             *   ---- ON ENTRY ----     *
+0528   3965             *                          *
+0529   3965             *  XREG: SLOTNUM TIMES $10 *
+0530   3965             *                          *
+0531   3965             *  READ MODE (Q6L, Q7L)    *
+0532   3965             *                          *
+0533   3965             *   ---- ON EXIT -----     *
+0534   3965             *                          *
+0535   3965             *  CARRY SET IF ERROR.     *
+0536   3965             *                          *
+0537   3965             *  IF NO ERROR:            *
+0538   3965             *    A-REG: HOLDS $AA.     *
+0539   3965             *    Y-REG: HOLDS $00.     *
+0540   3965             *    X-REG: UNCHANGED.     *
+0541   3965             *    CARRY CLEAR.          *
+0542   3965             *                          *
+0543   3965             *    CSSTV HOLDS CHKSUM,   *
+0544   3965             *      SECTOR, TRACK, AND  *
+0545   3965             *      VOLUME READ.        *
+0546   3965             *                          *
+0547   3965             *    USES TEMPS COUNT,     *
+0548   3965             *      LAST, CSUM, AND     *
+0549   3965             *      4 BYTES AT CSSTV.   *
+0550   3965             *                          *
+0551   3965             *    ---- EXPECTS ----     *
+0552   3965             *                          *
+0553   3965             *  NORMAL DENSITY NIBLS    *
+0554   3965             *   (4-BIT), ODD BITS,     *
+0555   3965             *   THEN EVEN.             *
+0556   3965             *                          *
+0557   3965             *    ---- CAUTION ----     *
+0558   3965             *                          *
+0559   3965             *         OBSERVE          *
+0560   3965             *    'NO PAGE CROSS'       *
+0561   3965             *      WARNINGS ON         *
+0562   3965             *    SOME BRANCHES!!       *
+0563   3965             *                          *
+0564   3965             *    ---- ASSUMES ----     *
+0565   3965             *                          *
+0566   3965             *    1 USEC CYCLE TIME     *
+0567   3965             *                          *
+0568   3965             ****************************
+0569   3965 A0 F8       RDADR	LDY	#$F8
+0570   3967 84 26       	STY	COUNT		;'MUST FIND' COUNT.
+0571   3969 C8          RDASYN	INY
+0572   396A D0 04       	BNE	RDA1		;LOW ORDER OF COUNT.
+0573   396C E6 26       	INC	COUNT		;(2K NIBLS TO FIND
+0574   396E F0 F3       	BEQ	RDERR		;  ADR MARK, ELSE ERR)
+0575   3970 BD 8C C0    RDA1	LDA	Q6L,X		;READ NIBL.
+0576   3973 10 FB       	BPL	RDA1		;*** NO PAGE CROSS! ***
+0577   3975 C9 D5       RDASN1	CMP	#$D5		;ADR MARK 1?
+0578   3977 D0 F0       	BNE	RDASYN		;  (LOOP IF NOT)
+0579   3979 EA          	NOP			;ADDED NIBL DELAY.
+0580   397A BD 8C C0    RDA2	LDA	Q6L,X
+0581   397D 10 FB       	BPL	RDA2		;*** NO PAGE CROSS! ***
+0582   397F C9 AA       	CMP	#$AA		;ADR MARK 2?
+0583   3981 D0 F2       	BNE	RDASN1		;  (IF NOT, IS IT AM1?)
+0584   3983 A0 03       	LDY	#$3		;INDEX FOR 4-BYTE READ.
+0585   3985             *            (ADDED NIBL DELAY)
+0586   3985 BD 8C C0    RDA3	LDA	Q6L,X
+0587   3988 10 FB       	BPL	RDA3		;*** NO PAGE CROSS! ***
+0588   398A C9 B5       	CMP	#$B5		;ADR MARK 3?
+0589   398C D0 E7       	BNE	RDASN1		;  (IF NOT, IS IT AM1?)
+0590   398E             *        (LEAVES CARRY SET!)
+0591   398E A9 00       	LDA	#$0		;INIT CHECKSUM.
+0592   3990 85 27       RDAFLD	STA	CSUM
+0593   3992 BD 8C C0    RDA4	LDA	Q6L,X		;READ 'ODD BIT' NIBL.
+0594   3995 10 FB       	BPL	RDA4 		;*** NO PAGE CROSS! ***
+0595   3997 2A          	ROLA			;ALIGN ODD BITS, '1' INTO LSB.
+0596   3998 85 26       	STA	LAST		;  (SAVE THEM)
+0597   399A BD 8C C0    RDA5	LDA	Q6L,X		;READ 'EVEN BIT' NIBL.
+0598   399D 10 FB       	BPL	RDA5		;*** NO PAGE CROSS! ***
+0599   399F 25 26       	AND	LAST		;MERGE ODD AND EVEN BITS.
+0600   39A1 99 2C 00    	STA	CSSTV,Y		;STORE DATA BYTE.
+0601   39A4 45 27       	EOR	CSUM		;XOR CHECKSUM.
+0602   39A6 88          	DEY	
+0603   39A7 10 E7       	BPL	RDAFLD		;LOOP ON 4 DATA BYTES.
+0604   39A9 A8          	TAY			;IF FINAL CHECKSUM
+0605   39AA D0 B7       	BNE	RDERR		;  NONZERO, THEN ERROR.
+0606   39AC BD 8C C0    RDA6	LDA	Q6L,X		;FIRST BIT-SLIP NIBL.
+0607   39AF 10 FB       	BPL	RDA6		;*** NO PAGE CROSS! ***
+0608   39B1 C9 DE       	CMP	#$DE
+0609   39B3 D0 AE       	BNE	RDERR		;ERROR IF NONMATCH.
+0610   39B5 EA          	NOP			;DELAY BETWEEN NIBLS.
+0611   39B6 BD 8C C0    RDA7	LDA	Q6L,X		;SECOND BIT-SLIP NIBL.
+0612   39B9 10 FB       	BPL	RDA7		;*** NO PAGE CROSS! ***
+0613   39BB C9 AA       	CMP	#$AA
+0614   39BD D0 A4       	BNE	RDERR		;ERROR IF NONMATCH.
+0615   39BF 18          RDEXIT	CLC			;CLEAR CARRY ON
+0616   39C0 60          	RTS			;NORMAL READ EXITS.
+
+Page      7                                      
+
+0617   39C1             	EJECT
+0618   39C1             ***************************
+0619   39C1             *                         *
+0620   39C1             *    POSTNIBLIZE SUBR     *
+0621   39C1             *                         *
+0622   39C1             ***************************
+0623   39C1             *                         *
+0624   39C1             *  CONVERTS 5-BIT NIBLS   *
+0625   39C1             *  OF FORM ABCDE000 IN    *
+0626   39C1             *  NBUF1 THROUGH NBUF8    *
+0627   39C1             *  INTO 256 BYTES OF      *
+0628   39C1             *  USER DATA IN BUF.      *
+0629   39C1             *                         *
+0630   39C1             *   ---- ON ENTRY ----    *
+0631   39C1             *                         *
+0632   39C1             *  X-REG: HOLDS SLOTNUM   *
+0633   39C1             *            TIMES $10.   *
+0634   39C1             *                         *
+0635   39C1             *  BUF IS 2-BYTE POINTER  *
+0636   39C1             *    TO 256 BYTES OF USER *
+0637   39C1             *    DATA TO BE CONVERTED *
+0638   39C1             *    TO 5-BIT NIBLS IN    *
+0639   39C1             *    NBUF1 THROUGH NBUF8  *
+0640   39C1             *    PRIOR TO WRITE.      *
+0641   39C1             *                         *
+0642   39C1             *   ---- ON EXIT -----    *
+0643   39C1             *                         *
+0644   39C1             *  A-REG: UNCERTAIN.      *
+0645   39C1             *  Y-REG: HOLDS $FF.      *
+0646   39C1             *  X-REG: HOLDS $FF.      *
+0647   39C1             *  CARRY: UNCERTAIN.      *
+0648   39C1             *                         *
+0649   39C1             *  5-BIT NIBLS OF FORM    *
+0650   39C1             *    000ABCDE IN 410      *
+0651   39C1             *    BYTES FROM NBUF1     *
+0652   39C1             *    TO NBUF8.            *
+0653   39C1             *                         *
+0654   39C1             ***************************
+0655   39C1 A2 32       POSTNIB	LDX	#$32		;INDEX FOR 51 PASSES.
+0656   39C3 A0 00       	LDY	#$0		;INDEX TO USER BUF.
+0657   39C5 BD 00 3C    POSTNB1 LDA	NBUF6,X
+0658   39C8 4A          	LSRA
+0659   39C9 4A          	LSRA
+0660   39CA 4A          	LSRA
+0661   39CB 85 27       	STA	T1
+0662   39CD 4A          	LSRA
+0663   39CE 85 26       	STA	T0
+0664   39D0 4A          	LSRA
+0665   39D1 1D 00 3B    	ORA	NBUF1,X
+0666   39D4 91 3E       	STA	(BUF),Y		;FIRST OF 5 USER BYTES.
+0667   39D6 C8          	INY
+0668   39D7 BD 33 3C    	LDA	NBUF7,X
+0669   39DA 4A          	LSRA
+0670   39DB 4A          	LSRA
+0671   39DC 4A          	LSRA
+0672   39DD 4A          	LSRA
+0673   39DE 26 27       	ROL	T1
+0674   39E0 4A          	LSRA
+0675   39E1 26 26       	ROL	T0
+0676   39E3 1D 33 3B    	ORA	NBUF2,X
+0677   39E6 91 3E       	STA	(BUF),Y		;SECOND OF 5 USER BYTES.
+0678   39E8 C8          	INY	
+0679   39E9 BD 66 3C    	LDA	NBUF8,X
+0680   39EC 4A          	LSRA
+0681   39ED 4A          	LSRA
+0682   39EE 4A          	LSRA
+0683   39EF 4A          	LSRA
+0684   39F0 26 27       	ROL	T1
+0685   39F2 4A          	LSRA
+0686   39F3 26 26       	ROL	T0
+0687   39F5 1D 66 3B    	ORA	NBUF3,X
+0688   39F8 91 3E       	STA	(BUF),Y		;THIRD OF 5 USER BYTES.
+0689   39FA C8          	INY	
+0690   39FB A5 26       	LDA	T0
+0691   39FD 29 07       	AND	#$7
+0692   39FF 1D 99 3B    	ORA	NBUF4,X
+0693   3A02 91 3E       	STA	(BUF),Y		;FOURTH OF 5 USER BYTES.
+0694   3A04 C8          	INY	
+0695   3A05 A5 27       	LDA	T1
+0696   3A07 29 07       	AND	#$7
+0697   3A09 1D CC 3B    	ORA	NBUF5,X
+0698   3A0C 91 3E       	STA	(BUF),Y		;FIFTH OF 5 USER BYTES.
+0699   3A0E C8          	INY	
+0700   3A0F CA          	DEX			;NEXT OF 51 PASSES.
+0701   3A10 10 B3       	BPL	POSTNB1		;HANDLE LAST USER
+0702   3A12 AD 99 3C    	LDA	NBUF8+$33	;  BYTE DIFFERENTLY.
+0703   3A15 4A          	LSRA
+0704   3A16 4A          	LSRA
+0705   3A17 4A          	LSRA
+0706   3A18 0D FF 3B    	ORA	NBUF5+$33
+0707   3A1B 91 3E       	STA	(BUF),Y
+0708   3A1D 60          	RTS
+
+Page      8                                      
+
+0709   3A1E             	EJECT
+0710   3A1E             **************************
+0711   3A1E             *                        *
+0712   3A1E             *  FAST SEEK SUBROUTINE  *
+0713   3A1E             *                        *
+0714   3A1E             **************************
+0715   3A1E             *                        *
+0716   3A1E             *   ---- ON ENTRY ----   *
+0717   3A1E             *                        *
+0718   3A1E             *  X-REG HOLDS SLOTNUM   *
+0719   3A1E             *         TIMES $10.     *
+0720   3A1E             *                        *
+0721   3A1E             *  A-REG HOLDS DESIRED   *
+0722   3A1E             *         HALFTRACK.     *
+0723   3A1E             *         (SINGLE PHASE) *
+0724   3A1E             *                        *
+0725   3A1E             *  CURTRK HOLDS CURRENT  *
+0726   3A1E             *          HALFTRACK.    *
+0727   3A1E             *                        *
+0728   3A1E             *   ---- ON EXIT -----   *
+0729   3A1E             *                        *
+0730   3A1E             *  A-REG UNCERTAIN.      *
+0731   3A1E             *  Y-REG UNCERTAIN.      *
+0732   3A1E             *  X-REG UNDISTURBED.    *
+0733   3A1E             *                        *
+0734   3A1E             *  CURTRK AND TRKN HOLD  *
+0735   3A1E             *      FINAL HALFTRACK.  *
+0736   3A1E             *                        *
+0737   3A1E             *  PRIOR HOLDS PRIOR     *
+0738   3A1E             *    HALFTRACK IF SEEK   *
+0739   3A1E             *    WAS REQUIRED.       *
+0740   3A1E             *                        *
+0741   3A1E             *  MONTIMEL AND MONTIMEH *
+0742   3A1E             *    ARE INCREMENTED BY  *
+0743   3A1E             *    THE NUMBER OF       *
+0744   3A1E             *    100 USEC QUANTUMS   *
+0745   3A1E             *    REQUIRED BY SEEK    *
+0746   3A1E             *    FOR MOTOR ON TIME   *
+0747   3A1E             *    OVERLAP.            *
+0748   3A1E             *                        *
+0749   3A1E             * --- VARIABLES USED --- *
+0750   3A1E             *                        *
+0751   3A1E             *  CURTRK, TRKN, COUNT,  *
+0752   3A1E             *    PRIOR, SLOTTEMP     *
+0753   3A1E             *    MONTIMEL, MONTIMEH  *
+0754   3A1E             *                        *
+0755   3A1E             **************************
+0756   3A1E 85 2A       SEEK	STA	TRKN		;TARGET TRACK.
+0757   3A20 CD 78 04    	CMP	CURTRK		;ON DESIRED TRACK?
+0758   3A23 F0 59       	BEQ	SEEKXIT		;  YES, HIT IT AND RETURN.
+0759   3A25 86 2B       	STX	SLOTTEMP	;SAVE X-REG.
+0760   3A27 A9 00       	LDA	#$0
+0761   3A29 85 26       	STA	TRKCNT		;HALFTRACK COUNT.
+0762   3A2B AD 78 04    SEEK2	LDA	CURTRK		;SAVE CURTRK FOR
+0763   3A2E 85 27       	STA	PRIOR		;  DELAYED TURNOFF.
+0764   3A30 38          	SEC	
+0765   3A31 E5 2A       	SBC	TRKN		;DELTA-TRACKS.
+0766   3A33 F0 42       	BEQ	SEEKEND		;DONE, FINISH SEEK.
+0767   3A35 B0 07       	BCS	OUT		;(MOVE OUT, NOT IN)
+0768   3A37 49 FF       	EOR	#$FF		;CALC TRKS TO GO.
+0769   3A39 EE 78 04    	INC	CURTRK		;INCR CURRENT TRACK (IN).
+0770   3A3C 90 05       	BCC	MINTST		;(ALWAYS TAKEN)
+0771   3A3E 69 FE       OUT	ADC	#$FE		;CALC TRKS TO GO.
+0772   3A40 CE 78 04    	DEC	CURTRK		;DECR CURRENT TRACK (OUT).
+0773   3A43 C5 26       MINTST	CMP	TRKCNT
+0774   3A45 90 02       	BCC	MAXTST		;  AND 'TRKS MOVED'.
+0775   3A47 A5 26       	LDA	TRKCNT
+0776   3A49 C9 0C       MAXTST	CMP	#$C
+0777   3A4B 90 02       	BCC	STEP		;IF > $B, USE $B.
+0778   3A4D A9 0B       	LDA	#$B
+0779   3A4F A8          STEP	TAY			;ACCELLERATION INDEX.
+0780   3A50 AD 78 04    	LDA	CURTRK
+0781   3A53 29 03       	AND	#$3		;INDEX TO 'CURRENT
+0782   3A55 0A          	ASLA			;   PHASE' OF 4-PHASE
+0783   3A56 05 2B       	ORA	SLOTTEMP	;  STEPPER.
+0784   3A58 AA          	TAX	
+0785   3A59 BD 81 C0    	LDA	PHASEON,X	;HIT NEXT PHASE
+0786   3A5C B9 90 3A    	LDA	ONTABLE,Y	;  FOR 'ONTIME'.
+0787   3A5F 20 7F 3A    	JSR	MSWAIT		;(100 USEC INTERVALS)
+0788   3A62 A5 27       	LDA	PRIOR
+0789   3A64 29 03       	AND	#$3		;INDEX TO 'PRIOR PHASE'
+0790   3A66 0A          	ASLA			;    OF 4-PHASE STEPPER.
+0791   3A67 05 2B       	ORA	SLOTTEMP
+0792   3A69 AA          	TAX	
+0793   3A6A BD 80 C0    	LDA	PHASEOFF,X	;PRIOR PHASE OFF,
+0794   3A6D B9 9C 3A    	LDA	OFFTABLE,Y	;  THEN WAIT 'OFFTIME'.
+0795   3A70 20 7F 3A    	JSR	MSWAIT		;(100 USEC INTERVALS)
+0796   3A73 E6 26       	INC	TRKCNT		;'TRACKS MOVED' COUNT.
+0797   3A75 D0 B4       	BNE	SEEK2		;(ALWAYS TAKEN)
+0798   3A77 A9 5F       SEEKEND	LDA	#$5F		;DELAY 9.5 MSEC FOR
+0799   3A79 20 7F 3A    	JSR	MSWAIT		;   SETTLING TIME.
+0800   3A7C A6 2B       	LDX	SLOTTEMP	;RESTORE X-REG.
+0801   3A7E 60          SEEKXIT	RTS			;RETURN.
+
+Page      9                                      
+
+0802   3A7F             	EJECT
+0803   3A7F             **************************
+0804   3A7F             *                        *
+0805   3A7F             *   MSWAIT SUBROUTINE    *
+0806   3A7F             *                        *
+0807   3A7F             **************************
+0808   3A7F             *                        *
+0809   3A7F             *  DELAYS A SPECIFIED    *
+0810   3A7F             *   NUMBER OF 100 USEC   *
+0811   3A7F             *   INTERVALS FOR MOTOR  *
+0812   3A7F             *   ON TIMING.           *
+0813   3A7F             *                        *
+0814   3A7F             *   ---- ON ENTRY ----   *
+0815   3A7F             *                        *
+0816   3A7F             *  A-REG: HOLDS NUMBER   *
+0817   3A7F             *        OF 100 USEC     *
+0818   3A7F             *        INTERVALS TO    *
+0819   3A7F             *        DELAY.          *
+0820   3A7F             *                        *
+0821   3A7F             *   ---- ON EXIT -----   *
+0822   3A7F             *                        *
+0823   3A7F             *  A-REG: HOLDS $00.     *
+0824   3A7F             *  X-REG: HOLDS $00.     *
+0825   3A7F             *  Y-REG: UNCHANGED.     *
+0826   3A7F             *  CARRY: SET.           *
+0827   3A7F             *                        *
+0828   3A7F             *  MONTIMEL, MONTIMEH    *
+0829   3A7F             *   ARE INCREMENTED ONCE *
+0830   3A7F             *   PER 100 USEC INTERVAL*
+0831   3A7F             *   FOR MOTON ON TIMING. *
+0832   3A7F             *                        *
+0833   3A7F             *   ---- ASSUMES ----    *
+0834   3A7F             *                        *
+0835   3A7F             *   1 USEC CYCLE TIME    *
+0836   3A7F             *                        *
+0837   3A7F             **************************
+0838   3A7F A2 11       MSWAIT	LDX	#$11
+0839   3A81 CA          MSW1	DEX			;DELAY 86 USEC.
+0840   3A82 D0 FD       	BNE	MSW1
+0841   3A84 E6 46       	INC	MONTIMEL
+0842   3A86 D0 02       	BNE	MSW2		;DOUBLE-BYTE
+0843   3A88 E6 47       	INC	MONTIMEH	;  INCREMENT.
+0844   3A8A 38          MSW2	SEC
+0845   3A8B E9 01       	SBC	#$1		;DONE 'N' INTERVALS?
+0846   3A8D D0 F0       	BNE	MSWAIT		;(A-REG COUNTS)
+0847   3A8F 60          	RTS
+
+Page     10                                      
+
+0848   3A90             	EJECT
+0849   3A90             **************************
+0850   3A90             *                        *
+0851   3A90             *  PHASE ON-, OFF-TIME   *
+0852   3A90             *   TABLES IN 100-USEC   *
+0853   3A90             *   INTERVALS. (SEEK)    *
+0854   3A90             *                        *
+0855   3A90             **************************
+0856   3A90 01 30 28    ONTABLE	DB	$01,$30,$28
+0857   3A93 24 20 1E    	DB	$24,$20,$1E
+0858   3A96 1D 1C 1C    	DB	$1D,$1C,$1C
+0859   3A99 1C 1C 1C    	DB	$1C,$1C,$1C
+0860   3A9C 70 2C 26    OFFTABLE DB	$70,$2C,$26
+0861   3A9F 22 1F 1E    	DB	$22,$1F,$1E
+0862   3AA2 1D 1C 1C    	DB	$1D,$1C,$1C
+0863   3AA5 1C 1C 1C    	DB	$1C,$1C,$1C
+
+Page     11                                      
+
+0864   3AA8             	EJECT
+0865   3AA8             **************************
+0866   3AA8             *                        *
+0867   3AA8             *     7-BIT TO 5-BIT     *
+0868   3AA8             *    'DENIBLIZE' TABL    *
+0869   3AA8             *                        *
+0870   3AA8             *      VALID CODES       *
+0871   3AA8             *    $AB TO $FF ONLY.    *
+0872   3AA8             *    ($DA NOT VALID)     *
+0873   3AA8             *                        *
+0874   3AA8             *   ---- CAUTION ----    *
+0875   3AA8             *                        *
+0876   3AA8             * INSURE THAT FOLLOWING  *
+0877   3AA8             *     'RE-ORG' IS OK.    *
+0878   3AA8             *                        *
+0879   3AA8             **************************
+0880   3AAB             	ORG	$3AAB
+0881   3AAB             * OBJ $BAAB
+0882   3AAB 00 01 08    	DB	$00,$01,$08
+0883   3AAE 10 18 02    	DB	$10,$18,$02
+0884   3AB1 03 04 05    	DB	$03,$04,$05
+0885   3AB4 06 20 28    	DB	$06,$20,$28
+0886   3AB7 30 07 09    	DB	$30,$07,$09
+0887   3ABA 38 40 0A    	DB	$38,$40,$0A
+0888   3ABD 48 50 58    	DB	$48,$50,$58
+0889   3AC0 0B 0C 0D    	DB	$0B,$0C,$0D
+0890   3AC3 0E 0F 11    	DB	$0E,$0F,$11
+0891   3AC6 12 13 14    	DB	$12,$13,$14
+0892   3AC9 15 16 17    	DB	$15,$16,$17
+0893   3ACC 19 1A 1B    	DB	$19,$1A,$1B
+0894   3ACF 1C 1D 1E    	DB	$1C,$1D,$1E
+0895   3AD2 21 22 23    	DB	$21,$22,$23
+0896   3AD5 24 60 68    	DB	$24,$60,$68
+0897   3AD8 25 26 70    	DB	$25,$26,$70
+0898   3ADB 78 27 80    	DB	$78,$27,$80
+0899   3ADE 88 90 29    	DB	$88,$90,$29
+0900   3AE1 2A 2B 2C    	DB	$2A,$2B,$2C
+0901   3AE4 2D 2E 2F    	DB	$2D,$2E,$2F
+0902   3AE7 31 32 33    	DB	$31,$32,$33
+0903   3AEA 98 A0 34    	DB	$98,$A0,$34
+0904   3AED A8 B0 B8    	DB	$A8,$B0,$B8
+0905   3AF0 35 36 37    	DB	$35,$36,$37
+0906   3AF3 39 3A C0    	DB	$39,$3A,$C0
+0907   3AF6 C8 D0 3B    	DB	$C8,$D0,$3B
+0908   3AF9 3C D8 E0    	DB	$3C,$D8,$E0
+0909   3AFC 3E E8 F0    	DB	$3E,$E8,$F0
+0910   3AFF F8          	DB	$F8
+
+Page     12                                      
+
+0911   3B00             	EJECT
+0912   3B00             **************************
+0913   3B00             *                        *
+0914   3B00             *     5-BIT TO 7-BIT     *
+0915   3B00             *     NIBL CONVERSION    *
+0916   3B00             *          TABLE         *
+0917   3B00             *                        *
+0918   3B00             **************************
+0919   3B00             *                        *
+0920   3B00             *     CODES $AA, $D5     *
+0921   3B00             *        NOT USED        *
+0922   3B00             *                        *
+0923   3B00             **************************
+0924   3C9A             	ORG	$3C9A
+0925   3C9A             * OBJ $BC9A
+0926   3C9A AB AD AE    NIBL	DB	$AB,$AD,$AE
+0927   3C9D AF B5 B6    	DB	$AF,$B5,$B6
+0928   3CA0 B7 BA BB    	DB	$B7,$BA,$BB
+0929   3CA3 BD BE BF    	DB	$BD,$BE,$BF
+0930   3CA6 D6 D7 DA    	DB	$D6,$D7,$DA
+0931   3CA9 DB DD DE    	DB	$0DB,$DD,$DE
+0932   3CAC DF EA EB    	DB	$DF,$EA,$EB
+0933   3CAF ED EE EF    	DB	$ED,$EE,$EF
+0934   3CB2 F5 F6 F7    	DB	$F5,$F6,$F7
+0935   3CB5 FA FB FD    	DB	$FA,$FB,$FD
+0936   3CB8 FE FF       	DB	$FE,$FF
+0937   3CBA 1C 1C 1C    	DB	$1C,$1C,$1C
+0938   3CBD             	END
+0939   3CBD              
+       Number of errors = 0

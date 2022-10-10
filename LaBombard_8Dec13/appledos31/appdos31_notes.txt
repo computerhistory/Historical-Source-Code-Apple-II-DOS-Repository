@@ -1,0 +1,70 @@
+
+Apple DOS 3.1 Source Code - Notes
+****************************************************************************************
+
+
+* The initial release of DOS 3.1 had a handful of bugs, two of which were particularly 
+  frustrating for users. The first bug prevented the ability to successfully run the
+  MASTER.CREATE program. You could INIT a slave disk just fine, but not a master
+  disk. Indeed, I've confirmed this with every DOS 3.1 disk image that I could find.
+  Apparently, a patch was published by a user group that fixed the issue, and that
+  patch was at some point incorporated in some of the later DOS 3.1 disks that were
+  distributed by Apple (it seems they didn't change the 3.1 revision number when they
+  released the updated disks). Try as I might, I haven't found any differences in the
+  RAWDOS binary or DOS/boot sectors on any of the disk images that I have located,
+  and I haven't located any documentation that provides any details on this particular
+  patch.
+
+  With that, I studied the source for a bit and pretty quickly found what the problem
+  was, and applied (what turned out to be) a simple two byte patch.
+
+  The second bug prevented Applesoft from READ'ing or WRITE'ing lines numbered greater
+  than 255. The patch that addressed this problem, while apparently not on the initial
+  release of DOS 3.1, WAS found on every disk image that I have located.
+
+  This source file, the included boot disk image, and the RAWDOS binary on the disk
+  image, all incorporate these two simple patches (thus the 'Patched Release'
+  reference at the top of the source file).
+  
+* This source file obviously includes the Apple DOS RWTS low-level subroutines
+  written by Steve Wozniak and Randy Wigginton. The original source listing file is
+  posted on the CHM website and named "Apple_DOS_RW_30May1978.txt".
+  
+  The object code for this part of the source was compared to sectors extracted from
+  an Apple DOS 3.1 master disk, as well as the RAWDOS binary distributed with DOS 3.1,
+  and somewhat surprisingly only a single byte was changed. The change occurs at
+  appdos31.asm source line number 4877. The delay byte in the original is $5F, and
+  with DOS 3.1 it's $FF.
+  
+  Note that this source not only contains the RWTS low-level subroutines that were
+  made available, but also the necessary RWTS main entry point routines.  The original
+  source listing for this part of RWTS has not been made available as of this writing.
+  With that, I took a stab at commenting that part of the disassembled code.
+  
+* This source file will produce a binary that is identical (with the one exception
+  noted at the top of the source file) to the RAWDOS binary image that was included
+  on the DOS 3.1 master disk.
+
+  The resulting binary was placed on a DOS 3.1 master disk image and named as RAWDOS,
+  the disk was booted, and then the MASTER.CREATE program was run (because we have the
+  necessary patch! :)) to create a new master disk. The new disk (INIT'ed with the
+  newly assembled RAWDOS binary) was tested and found to be working perfectly.
+  
+  And (just for the fun of it :)), I also placed the various components of this binary
+  directly on the appropriate sectors of a disk image, set some of the initial EC3, IOB,
+  and various 'MISC BUT REQD CELLS' values that are required to boot, and it also boots
+  and runs just fine.
+  
+* The disk image (Apple DOS 3.1 Master - AFS.nib) included with this archive is the
+  result of running MASTER.CREATE with the assembled RAWDOS binary, and then copying
+  (loading/saving) the additional files that were distributed with the DOS 3.1 master
+  disk from an original 3.1 master disk image. It is in the 'nibblized' image format,
+  which should be supported by most (if not all) Apple II emulators.
+
+
+
+  Scott LaBombard
+  labomb@rochester.rr.com
+  12/07/2013
+  
+  

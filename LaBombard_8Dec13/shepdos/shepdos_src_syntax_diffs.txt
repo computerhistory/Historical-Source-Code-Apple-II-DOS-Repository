@@ -1,0 +1,103 @@
+
+This document details syntax changes that were made to the original pre-release Apple
+DOS source code written in 1978 by Paul Laughton, then an employee of Shepardson
+Microsystems.
+
+The source document is identified by the following text on it's first page:
+
+	.TITLE	SHEP,'APPLE DOS"
+*	6.3	10-6-78
+*	8 BIT ASSEMBLER
+	.M6502
+*
+**************************************************************************************
+*	(C)  COPYRIGHT 1978  APPLE COMPUTER, INC
+**************************************************************************************
+*
+
+My objective was to retain as much of the original source syntax as possible, but
+inevitably some changes were required in order to successfully assemble the source so
+that a visual comparison of the the generated object code could be performed.
+
+Some years ago I purchased the source code for the assembler used in this effort, and
+as such I was able to modify it and re-compile it to accommodate several of the somewhat
+more 'unique' directives and syntax that Paul's assembler utilized. For example, I made
+the necessary modifications to handle the DB01 and DB11 directives, the BOUND directive,
+and to handle using an '*' as a comment line character in addition to a ';'. I also
+added support for the accumulator byte manipulation instructions syntax (ROLA, ASLA,
+LSRA, etc... instead of ROL A, ASL A, etc...).
+
+I've attempted to provide as much detail as I can here, so it may appear that a lot of
+the original source syntax was changed, but that's really not the case. It would take
+only a couple of minutes to revert the few syntax adjustments made back to the original
+if desired.
+
+The source changes, in no particular order, are summarized as follows:
+
+1. There are several references to page zero address labels that occur before the labels
+   are actually defined. The specific labels are LENGTH, ZPGWRK, and ZPGFCB. The values
+   for each of these are set with equates on lines 194, 313, and 339 respectively. Any
+   instructions that utilized these labels as the operand on source lines prior to these
+   equates did not generate 2-byte zero page opcodes, but rather generated 3-byte absolute
+   address opcodes. Any instructions that reference these address labels after the equates
+   do generate the expected 2-byte zero page opcodes.
+
+   All of the 6502 cross-assemblers that I have tested will automatically generate zero
+   page opcodes if the referenced address is < 256. I had to come up with a way to force
+   absolute address opcodes as per the original source for these labels prior to the
+   equates. To do so, you will find an exclamation point (!) character as a prefix to
+   ZPGWRK, ZPGFCB, and LENGTH references between lines 31 and 186 of the original source
+   (23 occurrences total). I modified my cross-assembler to generate absolute addresses
+   for operands that begin with a '!' as per Paul's assembler.
+
+2. The DSPAGE equate on line 191 was changed ...specifically the reference to START was
+   changed to STARTT. The problem is START isn't defined until later in the source, so
+   while the original assembler used by Paul had no issue with this, today's assemblers
+   generate a forward reference error. I modified my assembler to provide the expected
+   results when it encounters STARTT.
+
+3. The .TITLE directive on line 1 was changed slightly. This directive only accepts a
+   single operand enclosed in double quotes, while Paul's assembler accepted multiple
+   operands optionally enclosed with single quotes.
+
+4. Address $29C8 is missing in the original PDF file listing. I determined what the
+   missing byte should be while working on the DOS 3.1 source code recreation (I have
+   the original 3.1 binary, so I was able to figure it out). The byte is $AD and it's
+   label is EML. These were added to the source.
+
+5. There are many define byte (DB) directives throughout the source that have operands
+   prefixed with either '@' or '@@'. The single @ prefixes numeric operands, the @@
+   prefixes label operands. It appears that Paul's assembler generated word length
+   opcodes instead of byte length opcodes whenever it encountered the @ or @@ prefixes.
+   
+   I am considering modifying my assembler to accommodate this syntax, but for now
+   I've changes each of the DB directives to DW directives to get the desired result.
+   Just search for @ and you should see a DW instead of a DB.
+
+   Note that with five exceptions, I was able to leave the @ and @@ prefixes as per
+   the original source. The five exceptions occur on lines 2179, 2182-2184, and 3705.
+   For some reason, the bytes generated on these five operands were incorrect if I
+   left the @ prefix, so they were removed. I suspect that this can be fixed with a
+   modification to the assembler, but I haven't looked into it yet.
+
+6. There are three lines with operands that add a single ASCII character byte to $80
+   to set bit 7 to '1'. They are on lines 534, 933, and 2750. The original source
+   used a single quote (') character to prefix the ASCII character. The assembler I
+   used requires that a single ASCII character is enclosed in single quotes, so these
+   three lines were changed accordingly.
+   
+7. The original label 'FCB' on line 3810, and the three references to it on lines 2839,
+   2853, and 3851 were changed to 'FCBB'. The assembler treats 'FCB' as a reserved word
+   (it's a valid directive).
+
+8. The #INCLUDE "MOTO.H" and .LIST lines at the top of the source aren't germane to
+   the source itself, but are required by the assembler I used. I wrote the include
+   file to define alternative syntax for several directives to more closely match the
+   original source listing. These lines can be removed from the source and assembly
+   listing if desired.
+
+
+   
+ Scott LaBombard
+ labomb@rochester.rr.com
+ 12/06/2013

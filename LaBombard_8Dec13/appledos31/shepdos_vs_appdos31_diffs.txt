@@ -1,0 +1,54 @@
+
+This document summarizes where changes occur in the Apple DOS 3.1 source code
+as compared to the pre-release Apple DOS source written in 1978 by Paul Laughton,
+then an employee of Shepardson Microsystems. 
+
+No attempt is made to explain why the changes were made... that is left to the
+reader to determine :).
+
+
+-----------------------------------------------------------------------------------
+source		source
+line #		line #
+shepdos.asm	appdos31.asm	change to appdos31.asm source - comments
+------------	------------	---------------------------------------------------
+
+ 35		 62		label DR1B moved up a line
+ 47		 75		BNE destination addr changed 
+ 51		 79		BNE destination addr changed
+ 55		 83		'find end of DOS' JSR to a PATCH
+ 382-389			instructions removed
+ 583-584			instructions removed
+ 644-646			instructions removed
+		 663-664	instructions added
+ 654				instructions removed
+ 826-827	 840-841	instruction order reversed
+ 1101				instruction removed
+ 1107-1108	 1120-1121	'verify a file' JMP to a PATCH
+ 1245		 1256-1259	instructions removed, new instructions added
+ 1274-1278			instructions removed
+ 1498				instruction removed
+ 1610				instruction removed
+ 1626				instruction removed
+ 1653				instruction removed
+ 1666				instruction removed
+ 1689-1691	 1688		instructions removed, JMP to AS r/w PATCH
+ 1694		 1691		BMI destination addr changed
+ 1695-1696			instructions removed
+ 1736-1741			instructions removed
+ 2234-2259	 2224-2249	various DB/DW default values differ
+		 2360		instruction added
+ 2406				instruction removed
+ 3670-3675	 3660-3665	various DB/DW default values differ
+ 3688-3699	 3678-3689	various DB/DW default values differ
+ 3720		 3710		DB value differs
+		 3851-3878	'find end of DOS' PATCH code added
+		 3994-4003	'verify a file' PATCH code added
+ 3991-4012	 4021-4042	various DB/DW default values differ
+  
+ 
+ 
+ Scott LaBombard
+ labomb@rochester.rr.com
+ 12/05/2013
+ 

@@ -1,0 +1,44 @@
+
+Shepardson Microsystems Pre-release Apple DOS Source Code - Notes
+**************************************************************************************
+
+  
+* A single visual comparison of the bytes listed in the shepdos assembly listing
+  and the bytes listed in the original pdf file listing has been performed, and
+  they were found to be identical. That said, additional comparisons should be
+  performed by a different set of eyes to help insure that the source file does
+  indeed produce an identical binary as per the original source.
+  
+* The shepdos binary was tested by placing it on the appropriate sectors of a DOS
+  3.1 master disk image and booting the result in an emulator. While it appeared
+  to boot, and I could verify that DOS was relocated to where it needed to be in
+  memory via the emulator debugger, all attempts to run any DOS commands just
+  resulted in a "*** SYNTAX ERR" message.
+  
+  I've also assembled a complete RAWDOS binary based on the shepdos source and
+  then used MASTER.CREATE to create a bootable disk image. Again the disk boots,
+  but all DOS commands still resulted in a syntax error.
+
+* The lowlevrw.asm source file contains the Apple DOS RWTS low-level subroutines
+  written by Steve Wozniak and Randy Wigginton. The resulting assembly listing and
+  binary are also included. This is the original source listing file posted on the
+  CHM website and named "Apple_DOS_RW_30May1978.txt". Minor syntax changes were
+  made to allow assembly with a cross-assembler.
+  
+  The resulting RWTS binary has been compared to sectors extracted from an Apple
+  DOS 3.1 master disk, as well as the RAWDOS binary distributed with DOS 3.1, and
+  somewhat surprisingly only a single byte was changed. The change occurs at binary
+  offset 0x278, source line number 798. The delay byte in the original is $5F, and
+  with DOS 3.1 it's $FF.
+  
+  Note that this source contains the RWTS low-level subroutines only, the RWTS main
+  entry point routine (referenced as DISKIO in the shepdos source) has not been
+  made available as of this writing.
+  
+
+
+  Scott LaBombard
+  labomb@rochester.rr.com
+  12/07/2013
+  
+  
