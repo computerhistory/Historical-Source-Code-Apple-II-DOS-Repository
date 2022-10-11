@@ -1,5 +1,3 @@
-README for Apple II DOS Repository  
-
 Copyright: The source code in this repository is Copyright ©1978 Apple Inc. and is made available only for non-commercial use. It may not be reproduced without permission from Apple.   
 
 The content is provided “as is” for educational and research purposes only. CHM makes no representations or warranties of any kind.  
