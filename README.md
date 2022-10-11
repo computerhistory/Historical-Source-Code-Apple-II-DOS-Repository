@@ -8,15 +8,15 @@ The Apple II computer was first released in 1977. The following year, Apple intr
 
 With thanks to Paul Laughton, in collaboration with Dr. Bruce Damer, founder and curator of the [DigiBarn Computer Museum](http://www.digibarn.com/), and with the permission of Apple Inc., we are pleased to make available the 1978 source code of Apple II DOS for non-commercial use. 
 
-There are seven files in this release:
-Lineprinter June 1978 102723981-05-01-acc.pdf: Scanned lineprinter listing from June 2, 1978
-Lineprinter October 1978 102723980-06-01-acc.pdf: Scanned lineprinter listing from October 6, 1978
-Apple_DOS_6Oct1978_retyped.docx: Retyped source code of the October 6th version (This has not yet been assembled, and there may be some typographical errors.)
-Apple_DOS_RW_30May1978.txt: The source code of the low-level read/write routines by Steve Wozniak and Randy Wigginton.
-Technical Documents 102723983-05-01-acc.pdf: Various technical specifications and designs relating to the Apple II disk drive
-Contracts 102723982-05-01-acc.pdf: Various contracts and addenda between Apple and Shepardson Microsystems
-Apple_DOS_meeting_5Oct1978.pdf: Minutes of a meeting between Apple and Shepardson Microsystem about bugs and enhancements. 
-Scott LaBombard, a dedicated vintage computer collector/restorer in New York, has done an amazing job researching and reconstructing Apple II DOS source code. He has given us permission to release the results of his work.
+There are seven files in this release:  
+Lineprinter June 1978 102723981-05-01-acc.pdf: Scanned lineprinter listing from June 2, 1978  
+Lineprinter October 1978 102723980-06-01-acc.pdf: Scanned lineprinter listing from October 6, 1978  
+Apple_DOS_6Oct1978_retyped.docx: Retyped source code of the October 6th version (This has not yet been assembled, and there may be some typographical errors.)  
+Apple_DOS_RW_30May1978.txt: The source code of the low-level read/write routines by Steve Wozniak and Randy Wigginton.  
+Technical Documents 102723983-05-01-acc.pdf: Various technical specifications and designs relating to the Apple II disk drive  
+Contracts 102723982-05-01-acc.pdf: Various contracts and addenda between Apple and Shepardson Microsystems  
+Apple_DOS_meeting_5Oct1978.pdf: Minutes of a meeting between Apple and Shepardson Microsystem about bugs and enhancements.  
+Scott LaBombard, a dedicated vintage computer collector/restorer in New York, has done an amazing job researching and reconstructing Apple II DOS source code. He has given us permission to release the results of his work.  
 
 It is found in the repository in the LaBombard_8Dec13 folder. 
 
